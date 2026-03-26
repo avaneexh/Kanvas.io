@@ -8,7 +8,6 @@ import { getHandles } from "../utils/resize";
 export default function Canvas() {
   const canvasRef = useRef(null);
 
-  // Zustand
   const elements = useCanvasStore((s) => s.elements);
   const tool = useCanvasStore((s) => s.tool);
   const color = useCanvasStore((s) => s.color);
@@ -23,28 +22,20 @@ export default function Canvas() {
   const selectedId = useCanvasStore((s) => s.selectedId);
   const setSelected = useCanvasStore((s) => s.setSelected);
 
-  // Local state
   const [isDrawing, setIsDrawing] = useState(false);
   const [start, setStart] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(null);
-  const [textInput, setTextInput] = useState(null);
 
-  const pathRef = useRef([]);
-
-  // =========================
-  // Helpers
   // =========================
   const getPos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left - pan.x) / zoom,
-      y: (e.clientY - rect.top - pan.y) / zoom
+      y: (e.clientY - rect.top - pan.y) / zoom,
     };
   };
 
-  // =========================
-  // Redraw
   // =========================
   const redraw = () => {
     const canvas = canvasRef.current;
@@ -55,44 +46,47 @@ export default function Canvas() {
 
     ctx.setTransform(zoom, 0, 0, zoom, pan.x, pan.y);
 
-    // Grid
-    const gridSize = 50;
-    ctx.strokeStyle = "#eee";
-    ctx.lineWidth = 1 / zoom;
-
-    for (let x = -5000; x < 5000; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, -5000);
-      ctx.lineTo(x, 5000);
-      ctx.stroke();
-    }
-
-    for (let y = -5000; y < 5000; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(-5000, y);
-      ctx.lineTo(5000, y);
-      ctx.stroke();
-    }
-
-    // Draw elements
     elements.forEach((el) => drawElement(ctx, el, zoom));
 
-    // Selection box
+    // ================= SELECTION =================
     if (selectedId) {
       const el = elements.find((e) => e.id === selectedId);
       if (!el) return;
 
+      const padding = 8 / zoom;
+
+      let x, y, w, h;
+
+      if (el.type === "line" || el.type === "arrow") {
+        x = Math.min(el.x, el.x2);
+        y = Math.min(el.y, el.y2);
+        w = Math.abs(el.x2 - el.x);
+        h = Math.abs(el.y2 - el.y);
+      } else {
+        x = Math.min(el.x, el.x + el.width);
+        y = Math.min(el.y, el.y + el.height);
+        w = Math.abs(el.width);
+        h = Math.abs(el.height);
+      }
+
+      // selection box (outside)
       ctx.strokeStyle = "blue";
       ctx.lineWidth = 1 / zoom;
-      ctx.strokeRect(el.x, el.y, el.width, el.height);
+      ctx.strokeRect(
+        x - padding,
+        y - padding,
+        w + padding * 2,
+        h + padding * 2,
+      );
 
+      // handles
       const handles = getHandles(el);
-
       handles.forEach((h) => {
         ctx.fillStyle = "white";
         ctx.strokeStyle = "blue";
-        ctx.fillRect(h.x - 4, h.y - 4, 8, 8);
-        ctx.strokeRect(h.x - 4, h.y - 4, 8, 8);
+
+        ctx.fillRect(h.x - 4 / zoom, h.y - 4 / zoom, 8 / zoom, 8 / zoom);
+        ctx.strokeRect(h.x - 4 / zoom, h.y - 4 / zoom, 8 / zoom, 8 / zoom);
       });
     }
   };
@@ -105,27 +99,19 @@ export default function Canvas() {
   }, [elements, zoom, pan, selectedId]);
 
   // =========================
-  // Mouse Down
-  // =========================
   const handleMouseDown = (e) => {
     const pos = getPos(e);
-
-    // TEXT
-    if (tool === "text") {
-      setTextInput({ x: pos.x, y: pos.y, value: "" });
-      return;
-    }
-
     const el = getElementAtPosition(pos.x, pos.y, elements);
 
-    // SELECTION
     if (tool === "selection") {
       if (el) {
         setSelected(el.id);
 
         const handles = getHandles(el);
         const handle = handles.find(
-          (h) => Math.abs(h.x - pos.x) < 8 && Math.abs(h.y - pos.y) < 8
+          (h) =>
+            Math.abs(h.x - pos.x) < 10 / zoom &&
+            Math.abs(h.y - pos.y) < 10 / zoom,
         );
 
         if (handle) {
@@ -140,17 +126,10 @@ export default function Canvas() {
       return;
     }
 
-    // DRAW
     setIsDrawing(true);
     setStart(pos);
-
-    if (tool === "freehand") {
-      pathRef.current = [pos];
-    }
   };
 
-  // =========================
-  // Mouse Move
   // =========================
   const handleMouseMove = (e) => {
     const pos = getPos(e);
@@ -162,67 +141,97 @@ export default function Canvas() {
       const dx = pos.x - start.x;
       const dy = pos.y - start.y;
 
-      updateElement(selectedId, {
-        x: el.x + dx,
-        y: el.y + dy
-      });
+      if (el.type === "line" || el.type === "arrow") {
+        updateElement(el.id, {
+          x: el.x + dx,
+          y: el.y + dy,
+          x2: el.x2 + dx,
+          y2: el.y2 + dy,
+        });
+      } else {
+        updateElement(el.id, {
+          x: el.x + dx,
+          y: el.y + dy,
+        });
+      }
 
       setStart(pos);
       return;
     }
 
-    // RESIZE (ALL CORNERS)
+    // RESIZE
     if (resizing) {
       const el = elements.find((e) => e.id === resizing.id);
 
+      // LINE / ARROW
+      if (el.type === "line" || el.type === "arrow") {
+        if (resizing.corner === "start") {
+          updateElement(el.id, { x: pos.x, y: pos.y });
+        } else {
+          updateElement(el.id, { x2: pos.x, y2: pos.y });
+        }
+        return;
+      }
+
+      const padding = 8 / zoom;
+
       let newProps = {};
 
-      switch (resizing.corner) {
-        case "br":
-          newProps = {
-            width: pos.x - el.x,
-            height: pos.y - el.y
-          };
-          break;
+      const x1 = el.x;
+      const y1 = el.y;
+      const x2 = el.x + el.width;
+      const y2 = el.y + el.height;
 
+      switch (resizing.corner) {
         case "tl":
           newProps = {
-            x: pos.x,
-            y: pos.y,
-            width: el.x + el.width - pos.x,
-            height: el.y + el.height - pos.y
+            x: pos.x + padding,
+            y: pos.y + padding,
+            width: x2 - (pos.x + padding),
+            height: y2 - (pos.y + padding),
           };
           break;
 
         case "tr":
           newProps = {
-            y: pos.y,
-            width: pos.x - el.x,
-            height: el.y + el.height - pos.y
+            y: pos.y + padding,
+            width: pos.x - padding - x1,
+            height: y2 - (pos.y + padding),
           };
           break;
 
         case "bl":
           newProps = {
-            x: pos.x,
-            width: el.x + el.width - pos.x,
-            height: pos.y - el.y
+            x: pos.x + padding,
+            width: x2 - (pos.x + padding),
+            height: pos.y - padding - y1,
+          };
+          break;
+
+        case "br":
+          newProps = {
+            width: pos.x - padding - x1,
+            height: pos.y - padding - y1,
           };
           break;
       }
 
-      updateElement(resizing.id, newProps);
-      return;
-    }
+      // normalize
+      if (newProps.width < 0) {
+        newProps.x = (newProps.x ?? x1) + newProps.width;
+        newProps.width = Math.abs(newProps.width);
+      }
 
-    // FREEHAND
-    if (isDrawing && tool === "freehand") {
-      pathRef.current.push(pos);
+      if (newProps.height < 0) {
+        newProps.y = (newProps.y ?? y1) + newProps.height;
+        newProps.height = Math.abs(newProps.height);
+      }
+
+      updateElement(el.id, newProps);
+      return;
     }
   };
 
-  // =========================
-  // Mouse Up
   // =========================
   const handleMouseUp = (e) => {
     const pos = getPos(e);
@@ -231,60 +240,53 @@ export default function Canvas() {
     setResizing(null);
 
     if (!isDrawing || !start) return;
-
     setIsDrawing(false);
 
-    const base = {
-      id: nanoid(),
-      x: start.x,
-      y: start.y,
-      strokeColor: color
-    };
+    const x = Math.min(start.x, pos.x);
+    const y = Math.min(start.y, pos.y);
+    const width = Math.abs(pos.x - start.x);
+    const height = Math.abs(pos.y - start.y);
 
     let el = null;
 
     if (tool === "rectangle") {
       el = {
-        ...base,
+        id: nanoid(),
         type: "rectangle",
-        width: pos.x - start.x,
-        height: pos.y - start.y
+        x,
+        y,
+        width,
+        height,
+        strokeColor: color,
       };
     }
 
     if (tool === "circle") {
-      el = {
-        ...base,
-        type: "ellipse",
-        width: pos.x - start.x,
-        height: pos.y - start.y
-      };
-    }
+      const x = Math.min(start.x, pos.x);
+      const y = Math.min(start.y, pos.y);
+      const width = Math.abs(pos.x - start.x);
+      const height = Math.abs(pos.y - start.y);
 
-    if (tool === "line") {
-      el = {
-        ...base,
-        type: "line",
-        x2: pos.x,
-        y2: pos.y
-      };
-    }
-
-    if (tool === "arrow") {
-      el = {
-        ...base,
-        type: "arrow",
-        x2: pos.x,
-        y2: pos.y
-      };
-    }
-
-    if (tool === "freehand") {
       el = {
         id: nanoid(),
-        type: "freehand",
-        points: pathRef.current,
-        strokeColor: color
+        type: "ellipse",
+        x,
+        y,
+        width,
+        height,
+        strokeColor: color,
+      };
+    }
+
+    if (tool === "line" || tool === "arrow") {
+      el = {
+        id: nanoid(),
+        type: tool,
+        x: start.x,
+        y: start.y,
+        x2: pos.x,
+        y2: pos.y,
+        strokeColor: color,
       };
     }
 
@@ -292,74 +294,33 @@ export default function Canvas() {
   };
 
   // =========================
-  // Zoom
-  // =========================
   const handleWheel = (e) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     setZoom(Math.min(Math.max(zoom * factor, 0.2), 5));
   };
 
-  // =========================
-  // Pan (FIXED)
-  // =========================
   const handlePan = (e) => {
     if (dragging || resizing || isDrawing) return;
-
     if (tool !== "selection" || e.buttons !== 1) return;
 
     setPan({
       x: pan.x + e.movementX,
-      y: pan.y + e.movementY
+      y: pan.y + e.movementY,
     });
   };
 
-  // =========================
-  // JSX
-  // =========================
   return (
-    <div className="relative w-full h-full">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full bg-white"
-        onMouseDown={handleMouseDown}
-        onMouseMove={(e) => {
-          handleMouseMove(e);
-          handlePan(e);
-        }}
-        onMouseUp={handleMouseUp}
-        onWheel={handleWheel}
-      />
-
-      {/* TEXT INPUT */}
-      {textInput && (
-        <input
-          autoFocus
-          style={{
-            position: "absolute",
-            left: textInput.x * zoom + pan.x,
-            top: textInput.y * zoom + pan.y
-          }}
-          value={textInput.value}
-          onChange={(e) =>
-            setTextInput({ ...textInput, value: e.target.value })
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              addElement({
-                id: nanoid(),
-                type: "text",
-                x: textInput.x,
-                y: textInput.y,
-                text: textInput.value,
-                strokeColor: color,
-                fontSize: 20
-              });
-              setTextInput(null);
-            }
-          }}
-        />
-      )}
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="w-full h-full bg-white"
+      onMouseDown={handleMouseDown}
+      onMouseMove={(e) => {
+        handleMouseMove(e);
+        handlePan(e);
+      }}
+      onMouseUp={handleMouseUp}
+      onWheel={handleWheel}
+    />
   );
 }
