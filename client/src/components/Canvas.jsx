@@ -265,10 +265,9 @@ export default function Canvas() {
       addElement(el);
     }
 
-    // 🔥 IMPORTANT (preview hatao)
     setPreview(null);
 
-    // reset
+
     setIsDrawing(false);
   };
 
