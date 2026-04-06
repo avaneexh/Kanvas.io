@@ -21,12 +21,28 @@ export const drawElement = (ctx, el, zoom) => {
       break;
 
     case "freehand":
+      if (!el.points || el.points.length < 2) return;
+
       ctx.beginPath();
-      el.points.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
       ctx.strokeStyle = el.strokeColor;
+      ctx.lineWidth = 2 / zoom; 
+      ctx.lineJoin = "round";   
+      ctx.lineCap = "round";    
+
+      ctx.moveTo(el.points[0].x, el.points[0].y);
+
+      for (let i = 1; i < el.points.length; i++) {
+        const midX = (el.points[i - 1].x + el.points[i].x) / 2;
+        const midY = (el.points[i - 1].y + el.points[i].y) / 2;
+
+        ctx.quadraticCurveTo(
+          el.points[i - 1].x,
+          el.points[i - 1].y,
+          midX,
+          midY
+        );
+      }
+
       ctx.stroke();
       break;
     
