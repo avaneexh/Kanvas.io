@@ -1,9 +1,16 @@
 import { useCanvasStore } from "../store/canvasStore";
+import { Undo2, Redo2 } from "lucide-react";
 
 const Topbar = () => {
   const tool = useCanvasStore((s) => s.tool);
   const color = useCanvasStore((s) => s.color);
   const setColor = useCanvasStore((s) => s.setColor);
+
+  const undo = useCanvasStore((s) => s.undo);
+  const redo = useCanvasStore((s) => s.redo);
+
+  const past = useCanvasStore((s) => s.past);
+  const future = useCanvasStore((s) => s.future);
 
   return (
     <div className="h-14 bg-white shadow flex items-center justify-between px-6">
@@ -13,7 +20,6 @@ const Topbar = () => {
       </div>
 
       <div className="flex items-center gap-4">
-
         <div className="flex items-center gap-2">
           <span className="text-sm">Color:</span>
           <input
@@ -27,15 +33,25 @@ const Topbar = () => {
         <div className="text-sm text-gray-600">
           Tool: <span className="font-medium">{tool}</span>
         </div>
-
       </div>
 
-      <div className="flex gap-4">
-        <button className="px-3 py-1 bg-gray-200 rounded">
-          Undo
+      <div className="flex gap-3">
+        {/* Undo */}
+        <button
+          onClick={undo}
+          disabled={!past.length}
+          className="p-2 rounded hover:bg-gray-200 disabled:opacity-40"
+        >
+          <Undo2 size={18} />
         </button>
-        <button className="px-3 py-1 bg-gray-200 rounded">
-          Redo
+
+        {/* Redo */}
+        <button
+          onClick={redo}
+          disabled={!future.length}
+          className="p-2 rounded hover:bg-gray-200 disabled:opacity-40"
+        >
+          <Redo2 size={18} />
         </button>
       </div>
     </div>
