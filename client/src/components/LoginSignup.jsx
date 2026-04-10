@@ -4,7 +4,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, X } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
-import { axiosInstance } from "../lib/axios";
 
 
 const loginSchema = z.object({

@@ -5,6 +5,7 @@ import connectDB from "./db/db.js";
 import cookieParser from "cookie-parser";
 import { initSocket } from "./socket/socket.js";
 import http from "http";
+import authRoutes from "./routes/auth.routes.js";
 
 
 
@@ -28,6 +29,8 @@ app.use(
 app.get("/", (req, res) => {
   res.send("Hello From Kanvas.io");
 });
+
+app.use("/api/v1/auth", authRoutes);
 
 const server = http.createServer(app);
 
