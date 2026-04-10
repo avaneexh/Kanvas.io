@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, X } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { GoogleLogin } from "@react-oauth/google";
 
 
 const loginSchema = z.object({
@@ -189,30 +188,7 @@ const LoginSignup = ({ onClose }) => {
           <span className="h-px flex-1 bg-black/20" />
           <span className="text-xs text-black/40">OR</span>
           <span className="h-px flex-1 bg-black/20" />
-        </div>
-
-        {/* Google */}
-        <GoogleLogin
-          onSuccess={async (cred) => {
-            try {
-              const res = await axiosInstance.post("/auth/google", {
-                token: cred.credential,
-              });
-
-              useAuthStore.setState({
-                authUser: res.data.user,
-              });
-
-              onClose();
-            } catch (err) {
-              console.log("Google login failed", err);
-            }
-          }}
-          onError={() => console.log("Google Login Failed")}
-          theme="filled_black"
-          size="large"
-          width="100%"
-        />
+        </div> 
       </div>
     </div>
   );
