@@ -146,7 +146,6 @@ export default function Canvas() {
       return;
     }
 
-    // RESIZE (same as before)
     if (resizing) {
       const el = elements.find((e) => e.id === resizing.id);
       if (!el) return;
@@ -203,7 +202,7 @@ export default function Canvas() {
     }
   };
 
-  // =========================
+
   const handleMouseUp = (e) => {
     const pos = getPos(e);
 
